@@ -9,6 +9,9 @@ reply. It targets either the local llama.cpp rig (default) or the Cloud Run vLLM
 **It is a demo** — its output is read by an audience, so detailed output is a requirement (see
 "Demo output" below), not something to hide behind a `--verbose` flag.
 
+Its MCP sibling, `~/gemma-rust-mcp`, asks the same question through each rig's MCP server
+instead of the HTTP endpoint. The two are separate crates and repos; nothing is shared.
+
 The CLI only *calls* servers. It never starts, stops, deploys, or configures them — the rigs do:
 
 - local: `make -C ~/gemma4-dev/local-llamacpp-1650ti-2b-q4_0 serve` (foreground; Ctrl-C is teardown), `... status`

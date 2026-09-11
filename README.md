@@ -10,6 +10,10 @@ code path:
 - **local**: llama.cpp's `llama-server` on a laptop GPU (GTX 1650 Ti), no auth
 - **Cloud Run**: vLLM on an NVIDIA L4, behind Google Cloud IAM
 
+Its sibling, [gemma-rust-mcp](https://github.com/xbill9/gemma-rust-mcp), asks the same question
+through each rig's own MCP server instead of the HTTP endpoint. Its README compares what each
+approach can show.
+
 ## Build
 
 Requires Rust 1.85+ (edition 2024).
