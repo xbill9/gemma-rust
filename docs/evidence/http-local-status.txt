@@ -1,0 +1,64 @@
+# captured 2026-09-11T16:27:08-04:00 on yoga9i, gemma-rust 0efdd86, local llama.cpp rig
+$ gemma-rust --status
+
+== Target ============================================================
+  endpoint               http://127.0.0.1:8080
+  target                 local (llama.cpp rig)
+  auth                   none
+
+== Health ============================================================
+  GET /health            200 OK in 0 ms
+  body                   {"status":"ok"}
+
+== Model =============================================================
+  served                 /home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf (context 8192 tokens)
+  using                  /home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf (first model the server lists)
+
+== Server ============================================================
+  GET /version           404 Not Found (not served by this server)
+  GET /props             200 OK in 0 ms
+  llama.cpp build        b1-95ef7fc
+  model_ftype            Q4_0
+  n_ctx                  8192
+  total_slots            1
+  is_sleeping            false
+  modalities             text only
+
+== Model details =====================================================
+  GET /v1/models         200 OK in 0 ms
+  created                1789158428
+  id                     /home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf
+  object                 model
+  owned_by               llamacpp
+  ftype                  Q4_0
+  n_ctx                  8192
+  n_ctx_train            131072
+  n_embd                 1536
+  n_params               4628569635 (4.63 B parameters)
+  n_vocab                262144
+  size                   3333699724 (3.33 GB on disk)
+  vocab_type             true
+
+== Slots =============================================================
+  GET /slots             200 OK in 0 ms
+  slots                  1 (0 busy)
+  slot 0                 n_ctx 8192, processing false
+
+== Metrics ===========================================================
+  GET /metrics           200 OK in 0 ms
+  prompt_tokens_total    9265
+  prompt_tokens_cached_total 13948
+  prompt_seconds_total   37.112
+  tokens_predicted_total 35394
+  tokens_predicted_seconds_total 520.984
+  n_decode_total         35532
+  n_tokens_max           2700
+  spec_decode_num_draft_tokens_total 0
+  spec_decode_num_accepted_tokens_total 0
+  spec_decode_num_drafts_total 0
+  prompt_tokens_seconds  263.812
+  predicted_tokens_seconds 67.523
+  requests_processing    0
+  requests_deferred      0
+  n_busy_slots_per_decode 1
+exit=0

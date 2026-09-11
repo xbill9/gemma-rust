@@ -1,0 +1,19 @@
+# failure-mode output, measured 2026-09-11. Copied verbatim from 'When something is wrong' in github.com/xbill9/gemma-rust README.md at commit 0efdd86.
+### When something is wrong
+
+```text
+# No local server running
+== Health ============================================================
+  cannot connect: error sending request for url (http://127.0.0.1:8099/health): client error (Connect): tcp connect error: Connection refused (os error 111)
+  The local llama-server is not running. Start it with:
+    make -C ~/gemma4-dev/local-llamacpp-1650ti-2b-q4_0 serve
+
+# Cloud Run without credentials (--auth none)
+  GET /health            403 Forbidden in 304 ms
+  body                   (299 bytes, not shown)
+  The server rejected the request's credentials. Cloud Run needs an identity token from an account with roles/run.invoker (`gcloud auth print-identity-token`).
+
+# --max-tokens 32 on llama.cpp: out of budget while still thinking (exit code 2)
+== Answer ============================================================
+  (empty) The model was still reasoning when it stopped. This is Gemma 4 thinking, not a broken server: raise --max-tokens.
+```

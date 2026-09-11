@@ -1,0 +1,47 @@
+# Cloud Run vLLM on NVIDIA L4, gemma-rust, measured 2026-09-11. Copied verbatim from the 'Cloud Run: vLLM on an NVIDIA L4' sample in github.com/xbill9/gemma-rust README.md at commit 0efdd86; service URL is a placeholder there.
+### Cloud Run: vLLM on an NVIDIA L4
+
+```text
+== Target ============================================================
+  endpoint               https://<your-service>.a.run.app
+  target                 Cloud Run
+  auth                   bearer token from gcloud auth print-identity-token (845 chars, not shown)
+
+== Health ============================================================
+  Cloud Run scales to zero: the first request can take minutes while a GPU instance starts.
+  GET /health            200 OK in 185 ms
+
+== Model =============================================================
+  served                 /mnt/models/gemma-4-E2B-it (context 16384 tokens)
+  using                  /mnt/models/gemma-4-E2B-it (first model the server lists)
+
+== Request ===========================================================
+  POST                   https://<your-service>.a.run.app/v1/chat/completions
+  prompt                 In one sentence, what is a TPU?
+  max_tokens             1024
+
+== Answer ============================================================
+  A TPU (Tensor Processing Unit) is a specialized integrated circuit designed to accelerate machine learning workloads, particularly those involving large matrix multiplications common in deep learning.
+
+== Reasoning =========================================================
+  (none returned)
+
+== Stats =============================================================
+  finish_reason          stop
+  prompt_tokens          18
+  cached_tokens          -
+  completion_tokens      31
+  total_tokens           49
+  latency (client)       662 ms
+  tokens/s (client)      46.8  (completion tokens / latency; includes network and prefill)
+
+== Response ==========================================================
+  id                     chatcmpl-a870c80a585e2371
+  model                  /mnt/models/gemma-4-E2B-it
+  system_fingerprint     vllm-0.26.0-a3e182ca
+```
+
+The local run is slower end to end (3.5 s vs 0.7 s) because Gemma spent 239 tokens reasoning
+first; Cloud Run answered in 31 tokens with no reasoning.
+
+### When something is wrong

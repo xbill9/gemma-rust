@@ -1,0 +1,138 @@
+# captured 2026-09-11T16:30:31-04:00 on yoga9i
+$ curl -s http://127.0.0.1:8080/health
+{"status":"ok"}
+$ make prod   # in gemma-rust
+Building release...
+    Finished `release` profile [optimized] target(s) in 0.08s
+Binary: target/release/gemma-rust
+$ ./target/release/gemma-rust --help
+Ask a Gemma 4 endpoint one question and show the details
+
+Usage: gemma-rust [OPTIONS] [PROMPT]
+
+Arguments:
+  [PROMPT]
+          Prompt to send [default: "In one sentence, what is a TPU?"]; with --interactive, the first turn
+
+Options:
+  -i, --interactive
+          Keep asking: read prompts from the terminal, sending each with the conversation so far
+
+      --status
+          Show what the server reports about itself (version, model, slots, metrics) and exit
+
+  -e, --endpoint <ENDPOINT>
+          Base URL of an OpenAI-compatible server: the local llama.cpp rig or a Cloud Run URL
+          
+          [env: GEMMA_ENDPOINT=]
+          [default: http://127.0.0.1:8080]
+
+  -m, --model <MODEL>
+          Model id [default: the first id the server lists at /v1/models]
+          
+          [env: GEMMA_MODEL=]
+
+      --auth <AUTH>
+          How to authenticate
+
+          Possible values:
+          - auto:   gcloud identity token for *.run.app endpoints, nothing otherwise
+          - gcloud: Always send a gcloud identity token
+          - none:   Never send credentials
+          
+          [default: auto]
+
+      --token <TOKEN>
+          Bearer token to send instead of asking gcloud for one
+          
+          [env: GEMMA_TOKEN]
+
+      --max-tokens <MAX_TOKENS>
+          Keep this >= 512: Gemma 4 can spend hundreds of tokens reasoning before it answers
+          
+          [default: 1024]
+
+      --temperature <TEMPERATURE>
+          Sampling temperature [default: the server's]
+
+      --system <SYSTEM>
+          Optional system prompt
+
+      --timeout <TIMEOUT>
+          Request timeout in seconds (Cloud Run can take minutes to cold-start a GPU instance)
+          
+          [default: 600]
+
+      --raw
+          Also print the raw JSON response
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+$ make prod   # in gemma-rust-mcp
+Building release...
+    Finished `release` profile [optimized] target(s) in 0.04s
+Binary: target/release/gemma-rust-mcp
+$ ./target/release/gemma-rust-mcp --help
+Ask a Gemma 4 rig one question through its MCP server and show the details
+
+Usage: gemma-rust-mcp [OPTIONS] [PROMPT]
+
+Arguments:
+  [PROMPT]
+          Prompt to send [default: "In one sentence, what is a TPU?"]; with --interactive, the first turn
+
+Options:
+  -i, --interactive
+          Keep asking: read prompts from the terminal, one query tool call each
+
+      --status
+          Only run the rig's read-only status tools (model, GPU memory, deployment); skip the query
+
+      --rig-help
+          Only run the rig's read-only help tool (its tools and configuration); skip the query
+
+  -r, --rig <RIG>
+          Which rig's MCP server to launch
+
+          Possible values:
+          - local:    llama.cpp on the local GPU: ~/gemma4-dev/local-llamacpp-1650ti-2b-q4_0
+          - cloudrun: vLLM on Cloud Run: ~/gemma4-dev/gpu-2B-cloudrun-devops-agent
+          
+          [env: GEMMA_RIG=]
+          [default: local]
+
+      --rig-dir <RIG_DIR>
+          Rig directory containing server.py [default: ~/gemma4-dev/<rig directory>]
+          
+          [env: GEMMA_RIG_DIR=]
+
+      --python <PYTHON>
+          Python interpreter that runs server.py
+          
+          [env: GEMMA_PYTHON=]
+          [default: python3]
+
+      --max-tokens <MAX_TOKENS>
+          max_tokens for the local rig's query_model (the Cloud Run stats tool takes none)
+          
+          [default: 1024]
+
+      --no-status
+          Skip the status tools and only run the query
+
+      --schemas
+          Also print every tool's input schema
+
+      --timeout <TIMEOUT>
+          Timeout in seconds for the handshake and for each tool call
+          
+          [default: 600]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version

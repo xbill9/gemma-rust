@@ -1,0 +1,111 @@
+# Cloud Run vLLM on NVIDIA L4, gemma-rust-mcp, measured 2026-09-11. Copied verbatim from the 'Cloud Run: vLLM on an NVIDIA L4' sample in github.com/xbill9/gemma-rust-mcp README.md at commit f270692; service URL is a placeholder there.
+### Cloud Run: vLLM on an NVIDIA L4
+
+```text
+== MCP server ========================================================
+  rig                    gpu-2B-cloudrun-devops-agent
+  command                python3 server.py
+  working dir            /home/xbill/gemma4-dev/gpu-2B-cloudrun-devops-agent
+  transport              stdio (child process)
+  pid                    278778
+  initialize             ok in 3219 ms
+
+== Server info =======================================================
+  name                   Self-Hosted vLLM DevOps Agent
+  version                (empty)
+  protocol               2025-11-25
+  capabilities           tools, resources, prompts
+
+== Tools =============================================================
+  tools/list             27 tools in 2 ms
+    cloudrun_save_hf_token                            Securely saves a Hugging Face API token to GCP Secret Manag…
+    cloudrun_get_endpoint_url                         Returns the current active vLLM endpoint URL without checki…
+    cloudrun_list_vertex_models                       Uses the Vertex AI SDK (part of ADK ecosystem) to list mode…
+    cloudrun_list_bucket_models                       Lists the contents of the GCS bucket to check for uploaded …
+    cloudrun_analyze_cloud_logging                    Fetches and summarizes error logs from Google Cloud Logging…
+    cloudrun_suggest_sre_remediation                  Proposes remediation steps for a specific SRE incident usin…
+    cloudrun_query                                    Directly queries the self-hosted vLLM model with a custom p…
+    cloudrun_get_deployment_config                    Generates the gcloud command to deploy vLLM to Cloud Run wi…
+    cloudrun_deploy                                   Deploys vLLM to Cloud Run with GPU.
+    cloudrun_destroy                                  Destroys the Cloud Run vLLM service.
+    cloudrun_status                                   Checks the status of the Cloud Run vLLM service.
+    cloudrun_update_scaling                           Updates the scaling configuration (min and max instances) f…
+    cloudrun_get_gpu_deployment_config                Generates a GKE (not Cloud Run) manifest and setup instruct…
+    cloudrun_get_vertex_ai_model_copy_instructions    Provides instructions and commands to transfer Gemma model …
+    cloudrun_get_huggingfacehub_download_path         Returns the local cache path for a Hugging Face model using…
+    cloudrun_get_huggingface_model_copy_instructions  Provides instructions and commands to transfer Gemma model …
+    cloudrun_check_gpu_quotas                         Checks GPU quotas for a specific region using gcloud comput…
+    cloudrun_verify_model_health                      Runs a deep health check with latency reporting on the Clou…
+    cloudrun_query_gemma4                             Queries the self-hosted Gemma 4 model on Cloud Run.
+  * cloudrun_query_gemma4_with_stats                  Queries the self-hosted Gemma 4 model on Cloud Run and retu…
+  * cloudrun_get_model_details                        Retrieves detailed information about the running Cloud Run …
+  * cloudrun_get_system_status                        Provides a high-level dashboard of Cloud Run system status.
+    cloudrun_get_endpoint                             Returns the active Cloud Run vLLM service URL if available.
+    cloudrun_run_benchmark                            Runs a performance/concurrency benchmark sweep against the …
+    cloudrun_analyze_gpu_logs                         Fetches Cloud Run logs for the specified service and uses G…
+    cloudrun_get_help                                 Provides help text and summarizes the configuration options…
+    cloudrun_get_metrics                              Fetches the Prometheus metrics from the active Cloud Run vL…
+  (* = called by this demo, which only calls read-only tools)
+
+== tools/call cloudrun_get_system_status =============================
+  arguments              {}
+  latency                2791 ms
+  isError                false
+  structuredContent      {"result": …} (same text as the content below)
+  result:
+    ### 🌀 GPU Cloud Run System Status (`gpu-2b-l4-devops-agent`)
+    - **vLLM Health:** 🟢 Online (https://<your-service>.a.run.app)
+    - **Cloud Run Service Status:** 🟢 Ready
+    **👉 Next Step:** Use `cloudrun_query_gemma4` to interact with the model.
+
+== tools/call cloudrun_get_model_details =============================
+  arguments              {}
+  latency                1705 ms
+  isError                false
+  structuredContent      {"result": …} (same text as the content below)
+  result:
+    ### 🧩 Model Details (https://<your-service>.a.run.app)
+    
+    **Model Information (`/v1/models`):**
+    ```json
+    [
+      {
+        "id": "/mnt/models/gemma-4-E2B-it",
+        "object": "model",
+        "owned_by": "vllm"
+      }
+    ]
+    ```
+    **Health Status (`/health`):**
+    - Status: `Healthy` ✅
+
+== tools/call cloudrun_query_gemma4_with_stats =======================
+  arguments              {"prompt":"In one sentence, what is a TPU?"}
+  latency                1333 ms
+  isError                false
+  structuredContent      {"result": …} (same text as the content below)
+  result:
+    ### 📊 Performance Stats
+    - **Model:** `/mnt/models/gemma-4-E2B-it`
+    - **Time to First Token (TTFT):** `0.086s`
+    - **Total Generation Time:** `0.688s`
+    - **Tokens per Second:** `53.11 tokens/s`
+    - **Total Tokens (approx.):** `32`
+    
+    ### 💬 Model Response
+    A TPU (Tensor Processing Unit) is a specialized type of integrated circuit designed to accelerate machine learning workloads, particularly those involving tensor operations common in deep learning.<turn|>
+
+== Server log (stderr) ===============================================
+  2026-09-11 11:41:32,212 - vllm-devops-agent - INFO - Initializing DevOps Agent MCP Server...
+  2026-09-11 11:41:32,260 - vllm-devops-agent - INFO - Attempting to discover vLLM URL for service: gpu-2b-l4-devops-agent
+  2026-09-11 11:41:33,284 - vllm-devops-agent - INFO - 📡 Automatically discovered vLLM at: https://<your-service>.a.run.app
+  2026-09-11 11:41:34,115 - httpx - INFO - HTTP Request: GET https://<your-service>.a.run.app/health "HTTP/1.1 200 OK"
+  2026-09-11 11:41:36,087 - httpx2 - INFO - HTTP Request: GET https://<your-service>.a.run.app/v1/models "HTTP/1.1 200 OK"
+  2026-09-11 11:41:36,754 - httpx - INFO - HTTP Request: GET https://<your-service>.a.run.app/health "HTTP/1.1 200 OK"
+  2026-09-11 11:41:36,756 - vllm-devops-agent - INFO - Querying model with stats with prompt: 'In one sentence, what is a TPU?...'
+  2026-09-11 11:41:37,399 - httpx2 - INFO - HTTP Request: GET https://<your-service>.a.run.app/v1/models "HTTP/1.1 200 OK"
+  2026-09-11 11:41:37,479 - httpx2 - INFO - HTTP Request: POST https://<your-service>.a.run.app/v1/chat/completions "HTTP/1.1 200 OK"
+  2026-09-11 11:41:38,087 - vllm-devops-agent - INFO - Model response with stats: TTFT=0.086s, TotalTime=0.688s
+```
+
+When the local model runs out of `--max-tokens` mid-thought (`--no-status --max-tokens 32`):

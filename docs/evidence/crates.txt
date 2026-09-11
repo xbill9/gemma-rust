@@ -1,0 +1,7 @@
+# captured 2026-09-11T16:29:57-04:00 on yoga9i: minimum Rust versions declared by the crates each CLI depends on (rust-version in their Cargo.toml, from ~/.cargo/registry)
+rmcp-3.3.0: rust-version = "1.88"
+reqwest-0.13.5: rust-version = "1.85.0"
+clap-4.6.6: rust-version = "1.85"
+# crates resolved in Cargo.lock, release binary size, source lines
+gemma-rust: 186 crates in Cargo.lock; release binary 8.5M; src/main.rs 777 lines
+gemma-rust-mcp: 121 crates in Cargo.lock; release binary 6.5M; src/main.rs 542 lines

@@ -1,0 +1,49 @@
+# captured 2026-09-11T16:27:14-04:00 on yoga9i, gemma-rust-mcp f270692, local rig
+$ gemma-rust-mcp --no-status --max-tokens 32 "In one sentence, what is a TPU?"
+
+== MCP server ========================================================
+  rig                    local-llamacpp-1650ti-2b-q4_0
+  command                python3 server.py
+  working dir            /home/xbill/gemma4-dev/local-llamacpp-1650ti-2b-q4_0
+  transport              stdio (child process)
+  pid                    334670
+  initialize             ok in 839 ms
+
+== Server info =======================================================
+  name                   local-llamacpp-1650ti-2b-q4_0
+  version                (empty)
+  protocol               2025-11-25
+  capabilities           tools, resources, prompts
+
+== Tools =============================================================
+  tools/list             7 tools in 1 ms
+    gpu_status           Report the local GPU: name, compute capability, VRAM total/…
+    model_info           Report the configured checkpoint, where it is, and the resi…
+    start_model_server   Start llama-server on the local GPU. No-op if it is already…
+    stop_model_server    Stop the running llama-server. Teardown is complete — nothi…
+    model_server_status  Check whether llama-server is up and serving at the known l…
+  * query_model          Send a chat completion to the local endpoint and return the…
+    get_help             List the tools this rig exposes.
+  (* = called by this demo, which only calls read-only tools)
+
+== tools/call query_model ============================================
+  arguments              {"max_tokens":32,"prompt":"In one sentence, what is a TPU?"}
+  latency                499 ms
+  isError                false
+  structuredContent      {"result": …} (same text as the content below)
+  result:
+    📡 **Reasoning only — no answer yet.** `finish_reason: length` after 32 tokens, all of them thinking.
+    
+    This is Gemma 4 reasoning, not a broken server. Re-run with a larger `max_tokens` (currently 32).
+    
+    <details>
+    
+    1.  **Identify the core concept:** The user wants a definition of a "TPU" (Tensor Processing Unit).
+    2.  
+    
+    </details>
+  No answer: the model was still reasoning when it stopped. Raise --max-tokens.
+
+== Server log (stderr) ===============================================
+  2026-09-11 16:27:15,752 INFO HTTP Request: POST http://127.0.0.1:8080/v1/chat/completions "HTTP/1.1 200 OK"
+exit=2

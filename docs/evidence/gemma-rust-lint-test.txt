@@ -1,0 +1,41 @@
+# captured 2026-09-11T16:28:01-04:00 on yoga9i, gemma-rust 0efdd86
+$ make lint
+Linting code...
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s
+exit=0
+$ make test
+Running tests...
+   Compiling libc v0.2.189
+   Compiling aws-lc-sys v0.45.0
+   Compiling nibble_vec v0.1.0
+   Compiling cfg-if v1.0.4
+   Compiling endian-type v0.2.0
+   Compiling unicode-width v0.2.2
+   Compiling unicode-segmentation v1.13.3
+   Compiling home v0.5.12
+   Compiling radix_trie v0.3.0
+   Compiling aws-lc-rs v1.18.1
+   Compiling mio v1.2.3
+   Compiling socket2 v0.6.5
+   Compiling nix v0.31.3
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio v1.53.1
+   Compiling rustls v0.23.44
+   Compiling rustyline v18.0.1
+   Compiling hyper v1.11.1
+   Compiling tower v0.5.3
+   Compiling tower-http v0.6.11
+   Compiling tokio-rustls v0.26.5
+   Compiling rustls-platform-verifier v0.7.0
+   Compiling hyper-util v0.1.20
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.13.5
+   Compiling gemma-rust v0.1.0 (/home/xbill/gemma-rust)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.29s
+     Running unittests src/main.rs (target/debug/deps/gemma_rust-44b388a78a3774dc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+exit=0

@@ -1,0 +1,63 @@
+# captured 2026-09-11T16:27:03-04:00 on yoga9i, gemma-rust 0efdd86, local llama.cpp rig
+$ gemma-rust "In one sentence, what is a TPU?"
+
+== Target ============================================================
+  endpoint               http://127.0.0.1:8080
+  target                 local (llama.cpp rig)
+  auth                   none
+
+== Health ============================================================
+  GET /health            200 OK in 0 ms
+  body                   {"status":"ok"}
+
+== Model =============================================================
+  served                 /home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf (context 8192 tokens)
+  using                  /home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf (first model the server lists)
+
+== Request ===========================================================
+  POST                   http://127.0.0.1:8080/v1/chat/completions
+  prompt                 In one sentence, what is a TPU?
+  max_tokens             1024
+
+== Answer ============================================================
+  A TPU (Tensor Processing Unit) is a specialized hardware accelerator designed by Google specifically to speed up the computationally intensive matrix operations required for training and running machine learning models.
+
+== Reasoning =========================================================
+  length                 1327 chars
+  1.  **Identify the core concept:** The user wants a one-sentence definition of a TPU (Tensor Processing Unit).
+  2.  **Recall/Define TPU:**
+      *   What is it? A specialized hardware accelerator.
+      *   What is its purpose? Designed for accelerating machine learning (specifically matrix multiplications and tensor operations).
+      *   What is it built on? Google's internal architecture, designed to be highly efficient for neural networks.
+  3.  **Draft potential sentences (Internal Check):**
+      *   *Draft 1 (Too simple):* A TPU is a computer chip used to run machine learning models quickly. (A bit too vague.)
+      *   *Draft 2 (More technical):* A TPU is a specialized piece of hardware developed by Google designed to accelerate the mathematical operations required for deep learning and machine learning tasks. (Accurate, but wordy.)
+      *   *Draft 3 (Balanced and concise):* A TPU is a specialized hardware accelerator built by Google specifically designed to speed up the computationally intensive matrix operations required for training and running machine learning models.
+  4.  **Select the best fit (Focusing on the essential function):** The best answer should highlight that it's hardware and its function in AI/ML.
+  5.  **Final Polish (Ensuring it stays one strong sentence):** (This leads to the suggested output.)
+
+== Stats =============================================================
+  finish_reason          stop
+  prompt_tokens          25
+  cached_tokens          7
+  completion_tokens      330
+  total_tokens           355
+  latency (client)       4786 ms
+  tokens/s (client)      69.0  (completion tokens / latency; includes network and prefill)
+
+== Server timings (llama.cpp) ========================================
+  cache_n                7
+  predicted_ms           4615.20
+  predicted_n            330
+  predicted_per_second   71.29
+  predicted_per_token_ms 14.03
+  prompt_ms              147.38
+  prompt_n               18
+  prompt_per_second      122.13
+  prompt_per_token_ms    8.19
+
+== Response ==========================================================
+  id                     chatcmpl-rTO4HJkYHsrE4WisG2mileq6Jmxn0R4f
+  model                  /home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf
+  system_fingerprint     b1-95ef7fc
+exit=0

@@ -1,0 +1,84 @@
+# captured 2026-09-11T16:27:08-04:00 on yoga9i, gemma-rust-mcp f270692, local rig
+$ gemma-rust-mcp "In one sentence, what is a TPU?"
+
+== MCP server ========================================================
+  rig                    local-llamacpp-1650ti-2b-q4_0
+  command                python3 server.py
+  working dir            /home/xbill/gemma4-dev/local-llamacpp-1650ti-2b-q4_0
+  transport              stdio (child process)
+  pid                    334541
+  initialize             ok in 793 ms
+
+== Server info =======================================================
+  name                   local-llamacpp-1650ti-2b-q4_0
+  version                (empty)
+  protocol               2025-11-25
+  capabilities           tools, resources, prompts
+
+== Tools =============================================================
+  tools/list             7 tools in 2 ms
+  * gpu_status           Report the local GPU: name, compute capability, VRAM total/…
+  * model_info           Report the configured checkpoint, where it is, and the resi…
+    start_model_server   Start llama-server on the local GPU. No-op if it is already…
+    stop_model_server    Stop the running llama-server. Teardown is complete — nothi…
+  * model_server_status  Check whether llama-server is up and serving at the known l…
+  * query_model          Send a chat completion to the local endpoint and return the…
+    get_help             List the tools this rig exposes.
+  (* = called by this demo, which only calls read-only tools)
+
+== tools/call gpu_status =============================================
+  arguments              {}
+  latency                14 ms
+  isError                false
+  structuredContent      {"result": …} (same text as the content below)
+  result:
+    📡 **GPU** — `local-llamacpp-1650ti-2b-q4_0`
+    
+    ```
+    NVIDIA GeForce GTX 1650 Ti with Max-Q Design, 7.5, 4096 MiB, 1632 MiB, 2101 MiB, 615.71.09
+    ```
+    
+    ⚠️  GTX 16-series (TU116/TU117): compute capability 7.5 but **no tensor cores**. Do not compare throughput against the T4-based `g4dn`/`g5g` rigs on the strength of a matching compute capability.
+
+== tools/call model_server_status ====================================
+  arguments              {}
+  latency                27 ms
+  isError                false
+  structuredContent      {"result": …} (same text as the content below)
+  result:
+    ✅ Serving at http://127.0.0.1:8080 (pid 83619). `/health` → 200.
+
+== tools/call model_info =============================================
+  arguments              {}
+  latency                1 ms
+  isError                false
+  structuredContent      {"result": …} (same text as the content below)
+  result:
+    📡 **Model** — `local-llamacpp-1650ti-2b-q4_0`
+    
+    - **Name:** `google/gemma-4-E2B-it-qat-q4_0-gguf`
+    - **Path:** `/home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf`
+    - **On disk:** 3.35 GB
+    - **Quantization slot:** `q4_0` — but the dominant tensor type is **Q6_K**. Both embedding tensors are Q6_K (2.257 GB of 3.334 GB); only the ~1.08 GB transformer body is actually Q4_0.
+    - **Resident on GPU:** ~1.31 GiB. `per_layer_token_embd` (1.93 GB, 58% of the file) is `TENSOR_READ_LAZY` and is served by GET_ROWS out of the mmap.
+    
+    Run `inspect_gguf.py` to re-derive the split from the artifact rather than trusting these numbers.
+
+== tools/call query_model ============================================
+  arguments              {"max_tokens":1024,"prompt":"In one sentence, what is a TPU?"}
+  latency                4608 ms
+  isError                false
+  structuredContent      {"result": …} (same text as the content below)
+  result:
+    ✅ **Reply**
+    
+    A TPU (Tensor Processing Unit) is a specialized integrated circuit developed by Google designed to accelerate machine learning workloads, specifically the complex matrix multiplications required by neural networks, significantly speeding up training and inference.
+    
+    ---
+    _(plus 1173 chars of reasoning, suppressed)_
+    prompt 25 tok · completion 326 tok · 71.3 tok/s
+
+== Server log (stderr) ===============================================
+  2026-09-11 16:27:09,682 INFO HTTP Request: GET http://127.0.0.1:8080/health "HTTP/1.1 200 OK"
+  2026-09-11 16:27:14,292 INFO HTTP Request: POST http://127.0.0.1:8080/v1/chat/completions "HTTP/1.1 200 OK"
+exit=0

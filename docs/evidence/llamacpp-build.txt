@@ -1,0 +1,19 @@
+# captured 2026-09-11T16:29:57-04:00 on yoga9i: the llama.cpp build behind the local rig
+# rig tpu.env:
+MODEL_NAME=google/gemma-4-E2B-it-qat-q4_0-gguf
+MODEL_PATH=/home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf
+LLAMA_CPP_COMMIT=95ef7fc
+LLAMA_SERVER_BIN=/home/xbill/llama.cpp/build/bin/llama-server
+HOST=127.0.0.1
+PORT=8080
+N_GPU_LAYERS=99
+CONTEXT_SIZE=8192
+# ~/llama.cpp/build/CMakeCache.txt:
+CMAKE_BUILD_TYPE:STRING=Release
+CMAKE_CUDA_ARCHITECTURES:UNINITIALIZED=75
+GGML_CUDA:BOOL=ON
+# nvcc:
+Build cuda_13.3.r13.3/compiler.38244171_0
+# model file:
+total 3271016
+-rw-rw-r-- 1 xbill xbill 3349516256 Sep  3 13:19 gemma-4-E2B_q4_0-it.gguf

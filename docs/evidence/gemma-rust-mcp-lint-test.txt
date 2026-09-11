@@ -1,0 +1,16 @@
+# captured 2026-09-11T16:28:08-04:00 on yoga9i, gemma-rust-mcp f270692
+$ make lint
+Linting code...
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s
+exit=0
+$ make test
+Running tests...
+   Compiling gemma-rust-mcp v0.1.0 (/home/xbill/gemma-rust-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.40s
+     Running unittests src/main.rs (target/debug/deps/gemma_rust_mcp-ecf7358c4416d256)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+exit=0
