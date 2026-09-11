@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Two Rust Clients for Gemma 4: Calling the Endpoint vs. Calling the MCP Server 🦀</title>
+  <meta name="description" content="Step by step: a Rust HTTP client (reqwest) and a Rust MCP client (rmcp) ask Gemma 4 E2B the same question on a local llama.cpp GPU and on Cloud Run — what each one can see, and what each one costs." />
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma-rust/main/docs/medium/img/devto-cover.7d2d0a3a.jpg" alt="Two Rust Clients for Gemma 4: Calling the Endpoint vs. Calling the MCP Server 🦀" /></figure>
+<p>This article provides a step by step guide to two small Rust CLIs
+that ask a self-hosted Gemma 4 E2B the same question. The first calls
+the model's OpenAI-compatible HTTP endpoint directly. The second is an
+MCP client: it launches the rig's own MCP server and asks through its
+tools.</p>
+<p><a
+href="https://github.com/xbill9/gemma-rust">https://github.com/xbill9/gemma-rust</a></p>
+<p><a
+href="https://github.com/xbill9/gemma-rust-mcp">https://github.com/xbill9/gemma-rust-mcp</a></p>
+<hr />
+<h4 id="what-is-this-project-trying-to-do">What is this project trying
+to Do?</h4>
+<p>Both CLIs are demos, and their output is read by an audience. So
+neither hides anything behind a <code>--verbose</code> flag: every run
+prints the target, the health check, the request, the answer, the
+model's reasoning, token counts, latency, and whatever the server says
+about itself.</p>
+<p>They run against two very different deployments of the same model
+with the same code:</p>
+<ul>
+<li><strong>local</strong>: llama.cpp's <code>llama-server</code> on a
+2021-era laptop GPU, a GTX 1650 Ti with 4 GiB, no auth</li>
+<li><strong>Cloud Run</strong>: vLLM on an NVIDIA L4, behind Google
+Cloud IAM</li>
+</ul>
+<p>The interesting part is what changes when the same question goes
+through MCP instead of HTTP. It is not the answer.</p>
+<hr />
+<h4 id="why-two-clients">Why Two Clients?</h4>
+<p>Because they answer two different questions.</p>
+<p><strong>gemma-rust shows what the model said.</strong> One HTTP call,
+the raw OpenAI-style response, every field printed.</p>
+<p><strong>gemma-rust-mcp shows what an agent sees.</strong> An MCP
+client like Claude Code never touches the endpoint. It calls tools, and
+gets back whatever those tools choose to report. Writing a second client
+in Rust — one that is not Claude Code and not the Python SDK the servers
+were built with — is the fastest way to find out what those servers
+actually return.</p>
+<p>Neither one starts, stops or deploys anything. The rigs do that.</p>
+<hr />
+<h4 id="how-does-this-all-fit-together">How Does This All Fit
+Together?</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma-rust/main/docs/medium/img/devto-gemma-rust-diagram-1.png" alt="diagram" /></p>
+<p>The MCP path makes the same HTTP call in the end. It just makes it
+from inside a Python process that the Rust client launched, and hands
+back markdown instead of JSON.</p>
+<hr />
+<h4 id="where-do-i-start">Where do I start?</h4>
+<p>The strategy for building the two clients is an incremental step by
+step approach.</p>
+<p>First, a model server is brought up locally and checked with
+<code>curl</code>. Then the HTTP client is built and validated against
+it, including the two ways Gemma 4 returns an empty answer from a
+healthy server. The same binary is then pointed at Cloud Run.</p>
+<p>Then the rig's Python MCP server is installed, the MCP client is
+built, and the same question goes through the same two servers again —
+which is where the comparison comes from.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>A Linux machine with an NVIDIA GPU, a working driver and the CUDA
+toolkit (<code>nvcc</code>) — this one is a GTX 1650 Ti, CUDA 13.3</li>
+<li><code>git</code>, <code>cmake</code>, a C++ compiler, and
+<code>curl</code></li>
+<li>Python 3 — for the rig's MCP server, not for the Rust clients</li>
+<li>A Hugging Face account that has accepted the Gemma license, and the
+<code>hf</code> CLI</li>
+<li>Optional: the Google Cloud SDK and a Gemma 4 Cloud Run service, for
+the cloud half. <a
+href="https://dev.to/gde/2b-gemma-4-deployment-with-cloud-run-nvidia-l4-mcp-sdk-2x-and-claude-code-4ml3">This
+article</a> deploys one.</li>
+</ul>
+<hr />
+<h4 id="step-1--install-rust">Step 1 — Install Rust</h4>
+<p>Use <code>rustup</code>:</p>
+<pre class="shell"><code>curl --proto &#39;=https&#39; --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
+rustc --version
+rustc 1.98.1 (48a229cea 2026-09-01)</code></pre>
+<p>Anything recent works. The floors come from the dependencies' own
+<code>rust-version</code>:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma-rust/main/docs/medium/img/devto-gemma-rust-table-1.png"
+alt="Table: Crate, Needs Rust, Needed by" /></p>
+<p>Both crates are edition 2024.</p>
+<hr />
+<h4 id="step-2--build-llamacpp-with-cuda">Step 2 — Build llama.cpp With
+CUDA</h4>
+<p><code>llama-server</code> is the local model server. Build it from
+source, at the commit the rig runs:</p>
+<pre class="shell"><code>git clone https://github.com/ggml-org/llama.cpp ~/llama.cpp
+cd ~/llama.cpp
+git checkout 95ef7fc
+cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=75 -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release -j --target llama-server
+ls build/bin/llama-server
+build/bin/llama-server</code></pre>
+<p><code>75</code> is Turing, which is what a GTX 1650 Ti is. Set your
+own card's compute capability there, or leave the flag off and let CMake
+detect it.</p>
+<hr />
+<h4 id="step-3--download-the-gemma-4-checkpoint">Step 3 — Download the
+Gemma 4 Checkpoint</h4>
+<p>The rig serves Google's QAT q4_0 GGUF of Gemma 4 E2B:</p>
+<pre class="shell"><code>hf auth login
+hf download google/gemma-4-E2B-it-qat-q4_0-gguf --local-dir ~/models/gemma-4-E2B-it-qat-q4_0
+ls -l ~/models/gemma-4-E2B-it-qat-q4_0/
+-rw-rw-r-- 1 xbill xbill 3349516256 Sep  3 13:19 gemma-4-E2B_q4_0-it.gguf</code></pre>
+<p>It fits a 4 GiB card because most of the file never leaves the host —
+the <a
+href="https://dev.to/gde/gemma-4-on-an-old-4-gb-laptop-gpu-qat-takes-it-from-95-gib-to-16-b5l">previous
+article</a> measures that.</p>
+<hr />
+<h4 id="step-4--start-the-model-server">Step 4 — Start the Model
+Server</h4>
+<p>Run it in the foreground; Ctrl-C is the whole teardown:</p>
+<pre class="shell"><code>~/llama.cpp/build/bin/llama-server \
+  -m ~/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf \
+  --host 127.0.0.1 --port 8080 -ngl 99 -c 8192</code></pre>
+<p>From a second terminal:</p>
+<pre class="shell"><code>curl -s http://127.0.0.1:8080/health
+{&quot;status&quot;:&quot;ok&quot;}</code></pre>
+<p>🟢 That is the whole server side for the local target. The rig wraps
+this same command as <code>make serve</code>, with its flags in
+<code>tpu.env</code>.</p>
+<hr />
+<h4 id="step-5--build-the-http-client">Step 5 — Build the HTTP
+Client</h4>
+<pre class="shell"><code>cd ~
+git clone https://github.com/xbill9/gemma-rust
+cd gemma-rust
+make prod
+Building release...
+    Finished `release` profile [optimized] target(s) in 0.08s
+Binary: target/release/gemma-rust</code></pre>
+<p>(That time is an incremental rebuild; a clean one compiles the
+dependency tree first.) The dependencies are few:</p>
+<pre class="toml"><code>[dependencies]
+anyhow = &quot;1.0.104&quot;
+clap = { version = &quot;4.6.6&quot;, features = [&quot;derive&quot;, &quot;env&quot;] }
+reqwest = { version = &quot;0.13.5&quot;, default-features = false, features = [&quot;blocking&quot;, &quot;json&quot;, &quot;rustls&quot;] }
+rustyline = &quot;18.0.1&quot;
+serde = { version = &quot;1.0.229&quot;, features = [&quot;derive&quot;] }
+serde_json = &quot;1.0.151&quot;</code></pre>
+<p><strong><code>blocking</code> is deliberate.</strong> One question,
+one answer — there is nothing to run concurrently, so there is no async
+runtime in the client's own code.</p>
+<p>Lint is the gate:</p>
+<pre class="shell"><code>make lint
+Linting code...
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s</code></pre>
+<p>That is <code>cargo clippy --all-targets -- -D warnings</code> and
+<code>cargo fmt --check</code>. <code>make test</code> runs and finds
+<code>0 tests</code>: both crates are demos, validated by running them
+against live servers, which is what the rest of this article does.</p>
+<hr />
+<h4 id="step-6--ask-the-local-model">Step 6 — Ask the Local Model</h4>
+<pre class="shell"><code>./target/release/gemma-rust &quot;In one sentence, what is a TPU?&quot;
+== Target ============================================================
+  endpoint               http://127.0.0.1:8080
+  target                 local (llama.cpp rig)
+  auth                   none
+ 
+== Health ============================================================
+  GET /health            200 OK in 0 ms
+  body                   {&quot;status&quot;:&quot;ok&quot;}
+ 
+== Model =============================================================
+  served                 /home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf (context 8192 tokens)
+  using                  /home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf (first model the server lists)
+ 
+== Request ===========================================================
+  POST                   http://127.0.0.1:8080/v1/chat/completions
+  prompt                 In one sentence, what is a TPU?
+  max_tokens             1024
+ 
+== Answer ============================================================
+  A TPU (Tensor Processing Unit) is a specialized hardware accelerator designed by Google specifically to speed up the computationally intensive matrix operations required for training and running machine learning models.
+ 
+== Reasoning =========================================================
+  length                 1327 chars
+  1.  **Identify the core concept:** The user wants a one-sentence definition of a TPU (Tensor Processing Unit).
+  ...
+ 
+== Stats =============================================================
+  finish_reason          stop
+  prompt_tokens          25
+  cached_tokens          7
+  completion_tokens      330
+  total_tokens           355
+  latency (client)       4786 ms
+  tokens/s (client)      69.0  (completion tokens / latency; includes network and prefill)
+ 
+== Server timings (llama.cpp) ========================================
+  predicted_ms           4615.20
+  predicted_n            330
+  predicted_per_second   71.29
+  prompt_ms              147.38
+  prompt_n               18
+  ...
+ 
+== Response ==========================================================
+  id                     chatcmpl-rTO4HJkYHsrE4WisG2mileq6Jmxn0R4f
+  model                  /home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf
+  system_fingerprint     b1-95ef7fc</code></pre>
+<p>✅ A one-sentence answer, and 1,327 characters of thinking in front
+of it. Gemma 4 on llama.cpp reasons by default, and that is where most
+of the 330 completion tokens went.</p>
+<hr />
+<h4 id="what-the-http-client-is-doing">What the HTTP Client Is
+Doing</h4>
+<p>Three decisions make one code path work on two servers that disagree
+about almost everything.</p>
+<p><strong>The model id comes from the server.</strong> llama.cpp
+accepts any <code>model</code> value; vLLM returns 404 unless it is
+exactly the served id. The only default that works on both is the first
+id from <code>/v1/models</code>:</p>
+<pre class="rust"><code>let model = served
+    .first()
+    .and_then(|m| m[&quot;id&quot;].as_str())
+    .context(&quot;the server listed no models at /v1/models; pass --model&quot;)?
+    .to_string();</code></pre>
+<p><strong>Both reasoning fields are read.</strong> The two servers put
+Gemma's thinking in different places:</p>
+<pre class="rust"><code>#[derive(Deserialize)]
+struct Message {
+    content: Option&lt;String&gt;,
+    /// Where llama.cpp puts Gemma 4&#39;s thinking
+    reasoning_content: Option&lt;String&gt;,
+    /// Where vLLM puts it
+    reasoning: Option&lt;String&gt;,
+}</code></pre>
+<p><strong>Server stats are optional and printed generically.</strong>
+llama.cpp returns a <code>timings</code> object; vLLM returns none. Both
+are <code>Option&lt;Value&gt;</code>, and whichever is present gets its
+own section.</p>
+<p>Auth follows the host: <code>--auth auto</code> runs
+<code>gcloud auth print-identity-token</code> for <code>*.run.app</code>
+endpoints only, and prints the token's length, never the token.</p>
+<hr />
+<h4
+id="mag_right-tip-two-ways-to-get-an-empty-reply-from-a-healthy-server">🔎
+Tip: Two Ways to Get an Empty Reply From a Healthy Server</h4>
+<p><strong>Use <code>/v1/chat/completions</code>, never
+<code>/v1/completions</code>.</strong> On these instruction-tuned
+checkpoints the raw completions endpoint returns empty text, which looks
+exactly like a broken server.</p>
+<p><strong>Give Gemma room to think.</strong> On llama.cpp,
+<code>content</code> stays empty until the thinking closes. Starve it
+and see:</p>
+<pre class="shell"><code>./target/release/gemma-rust --max-tokens 32 &quot;In one sentence, what is a TPU?&quot;; echo &quot;exit=$?&quot;
+== Request ===========================================================
+  POST                   http://127.0.0.1:8080/v1/chat/completions
+  prompt                 In one sentence, what is a TPU?
+  max_tokens             32
+  warning: below 512, Gemma 4 may still be reasoning when it hits the limit and return an empty answer
+ 
+== Answer ============================================================
+  (empty) The model was still reasoning when it stopped. This is Gemma 4 thinking, not a broken server: raise --max-tokens.
+ 
+== Reasoning =========================================================
+  length                 116 chars
+  1.  **Analyze the Request:** The user wants a definition of a TPU (Tensor Processing Unit) in a *single sentence*.
+  2
+ 
+== Stats =============================================================
+  finish_reason          length
+  The reply hit max_tokens and is cut off.
+exit=2</code></pre>
+<p><code>finish_reason: length</code>, empty <code>content</code>,
+non-empty reasoning. The CLI says what happened and <strong>exits
+2</strong>, so a script cannot mistake an empty answer for success. That
+is why <code>--max-tokens</code> defaults to 1024.</p>
+<hr />
+<h4 id="what-does-the-server-say-about-itself">What Does the Server Say
+About Itself?</h4>
+<p><code>--status</code> skips the question and probes every endpoint
+either server might offer:</p>
+<pre class="shell"><code>./target/release/gemma-rust --status
+== Server ============================================================
+  GET /version           404 Not Found (not served by this server)
+  GET /props             200 OK in 0 ms
+  llama.cpp build        b1-95ef7fc
+  model_ftype            Q4_0
+  n_ctx                  8192
+  total_slots            1
+  modalities             text only
+ 
+== Model details =====================================================
+  GET /v1/models         200 OK in 0 ms
+  n_ctx_train            131072
+  n_embd                 1536
+  n_params               4628569635 (4.63 B parameters)
+  size                   3333699724 (3.33 GB on disk)
+ 
+== Slots =============================================================
+  GET /slots             200 OK in 0 ms
+  slots                  1 (0 busy)
+ 
+== Metrics ===========================================================
+  GET /metrics           200 OK in 0 ms
+  predicted_tokens_seconds 67.523
+  requests_processing    0
+  ...</code></pre>
+<p><strong>A 404 is reported, not an error.</strong>
+<code>/version</code> is vLLM's; <code>/props</code> and
+<code>/slots</code> are llama.cpp's. Each server answers half the
+probes, and the list of which ones is itself useful.</p>
+<hr />
+<h4 id="step-7--point-it-at-cloud-run">Step 7 — Point It at Cloud
+Run</h4>
+<p>Same binary, different endpoint. If you deployed the Cloud Run rig,
+its Makefile prints the URL:</p>
+<pre class="shell"><code>GEMMA_ENDPOINT=$(make -s -C ~/gemma4-dev/gpu-2B-cloudrun-devops-agent endpoint) \
+  ./target/release/gemma-rust &quot;In one sentence, what is a TPU?&quot;
+== Target ============================================================
+  endpoint               https://&lt;your-service&gt;.a.run.app
+  target                 Cloud Run
+  auth                   bearer token from gcloud auth print-identity-token (845 chars, not shown)
+ 
+== Health ============================================================
+  Cloud Run scales to zero: the first request can take minutes while a GPU instance starts.
+  GET /health            200 OK in 185 ms
+ 
+== Model =============================================================
+  served                 /mnt/models/gemma-4-E2B-it (context 16384 tokens)
+  using                  /mnt/models/gemma-4-E2B-it (first model the server lists)
+ 
+== Answer ============================================================
+  A TPU (Tensor Processing Unit) is a specialized integrated circuit designed to accelerate machine learning workloads, particularly those involving large matrix multiplications common in deep learning.
+ 
+== Reasoning =========================================================
+  (none returned)
+ 
+== Stats =============================================================
+  finish_reason          stop
+  prompt_tokens          18
+  cached_tokens          -
+  completion_tokens      31
+  total_tokens           49
+  latency (client)       662 ms
+  tokens/s (client)      46.8  (completion tokens / latency; includes network and prefill)
+ 
+== Response ==========================================================
+  id                     chatcmpl-a870c80a585e2371
+  model                  /mnt/models/gemma-4-E2B-it
+  system_fingerprint     vllm-0.26.0-a3e182ca</code></pre>
+<p>🟢 31 tokens and no reasoning — vLLM does not think by default here —
+so the round trip is 662 ms. The service is
+<code>--no-allow-unauthenticated</code>; without a token the CLI
+explains itself instead of dumping Google's error page:</p>
+<pre class="plaintext"><code>  GET /health            403 Forbidden in 304 ms
+  body                   (299 bytes, not shown)
+  The server rejected the request&#39;s credentials. Cloud Run needs an identity token from an account with roles/run.invoker (`gcloud auth print-identity-token`).</code></pre>
+<p>What the one code path had to absorb:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma-rust/main/docs/medium/img/devto-gemma-rust-table-2.png"
+alt="Table: local llama.cpp, Cloud Run vLLM 0.26" /></p>
+<hr />
+<h4 id="step-8--install-the-rigs-mcp-server">Step 8 — Install the Rig's
+MCP Server</h4>
+<p>The MCP client does not talk to the model. It launches a rig's
+<code>server.py</code>, so the rigs come next:</p>
+<pre class="shell"><code>git clone https://github.com/xbill9/gemma4-dev ~/gemma4-dev
+make -C ~/gemma4-dev/local-llamacpp-1650ti-2b-q4_0 install
+python3 -c &quot;import importlib.metadata as m;print(&#39;mcp&#39;, m.version(&#39;mcp&#39;))&quot;
+mcp 2.2.0</code></pre>
+<p>The rig servers need <code>mcp&gt;=2</code> — the Python SDK line
+where <code>FastMCP</code> became <code>MCPServer</code>. They install
+into the system <code>python3</code>; if yours refuses system-wide
+installs, use a virtualenv and point the client at it with
+<code>--python</code> or <code>GEMMA_PYTHON</code>.</p>
+<p>The rig reads its model path and <code>llama-server</code> location
+from <code>tpu.env</code>. A real environment variable wins over that
+file, so set <code>MODEL_PATH</code> and <code>LLAMA_SERVER_BIN</code>
+if yours live somewhere else.</p>
+<hr />
+<h4 id="step-9--build-the-mcp-client">Step 9 — Build the MCP Client</h4>
+<pre class="shell"><code>cd ~
+git clone https://github.com/xbill9/gemma-rust-mcp
+cd gemma-rust-mcp
+make prod
+Building release...
+    Finished `release` profile [optimized] target(s) in 0.04s
+Binary: target/release/gemma-rust-mcp</code></pre>
+<p>The feature flags are the part to get right. <code>rmcp</code>'s
+defaults are <code>base64</code>, <code>macros</code> and
+<code>server</code> — a server's feature set. A client has to ask for
+<code>client</code> and a transport by name:</p>
+<pre class="toml"><code>[dependencies]
+anyhow = &quot;1.0.104&quot;
+clap = { version = &quot;4.6.6&quot;, features = [&quot;derive&quot;, &quot;env&quot;] }
+rmcp = { version = &quot;3.3.0&quot;, features = [&quot;client&quot;, &quot;transport-child-process&quot;] }
+rustyline = &quot;18.0.1&quot;
+serde = &quot;1.0.229&quot;
+serde_json = &quot;1.0.151&quot;
+tokio = { version = &quot;1.53.1&quot;, features = [&quot;macros&quot;, &quot;rt-multi-thread&quot;, &quot;process&quot;, &quot;time&quot;] }</code></pre>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma-rust/main/docs/medium/img/devto-gemma-rust-table-3.png"
+alt="Table: Feature, What it brings" /></p>
+<p><code>make lint</code> is clean here too, and <code>make test</code>
+again finds <code>0 tests</code>.</p>
+<hr />
+<h4 id="the-mcp-client-in-four-moves">The MCP Client in Four Moves</h4>
+<p><strong>Launch the server as a child process.</strong> The rig opens
+its files by relative path, so the working directory matters. Stderr is
+piped so the server's own log can be printed at the end:</p>
+<pre class="rust"><code>let mut cmd = Command::new(&amp;args.python);
+cmd.arg(&quot;server.py&quot;).current_dir(&amp;dir);
+let (transport, stderr) = TokioChildProcess::builder(cmd)
+    .stderr(Stdio::piped())
+    .spawn()?;</code></pre>
+<p><strong>Handshake.</strong> The client handler is <code>()</code> —
+this client has no callbacks to offer the server:</p>
+<pre class="rust"><code>let client = tokio::time::timeout(timeout, ().serve(transport)).await??;</code></pre>
+<p><strong>List the tools</strong>, then <strong>call one</strong>:</p>
+<pre class="rust"><code>let tools = client.list_all_tools().await?;
+ 
+let params = CallToolRequestParams::new(name).with_arguments(arguments);
+let result = client.call_tool(params).await?;</code></pre>
+<p>💡 <code>CallToolRequestParams</code> is
+<code>#[non_exhaustive]</code>, so a struct literal will not compile.
+Use the constructor and the builder method.</p>
+<hr />
+<h4 id="step-10--ask-through-mcp">Step 10 — Ask Through MCP</h4>
+<pre class="shell"><code>./target/release/gemma-rust-mcp &quot;In one sentence, what is a TPU?&quot;
+== MCP server ========================================================
+  rig                    local-llamacpp-1650ti-2b-q4_0
+  command                python3 server.py
+  working dir            /home/xbill/gemma4-dev/local-llamacpp-1650ti-2b-q4_0
+  transport              stdio (child process)
+  pid                    334541
+  initialize             ok in 793 ms
+ 
+== Server info =======================================================
+  name                   local-llamacpp-1650ti-2b-q4_0
+  version                (empty)
+  protocol               2025-11-25
+  capabilities           tools, resources, prompts
+ 
+== Tools =============================================================
+  tools/list             7 tools in 2 ms
+  * gpu_status           Report the local GPU: name, compute capability, VRAM total/…
+  * model_info           Report the configured checkpoint, where it is, and the resi…
+    start_model_server   Start llama-server on the local GPU. No-op if it is already…
+    stop_model_server    Stop the running llama-server. Teardown is complete — nothi…
+  * model_server_status  Check whether llama-server is up and serving at the known l…
+  * query_model          Send a chat completion to the local endpoint and return the…
+    get_help             List the tools this rig exposes.
+  (* = called by this demo, which only calls read-only tools)
+ 
+== tools/call gpu_status =============================================
+  arguments              {}
+  latency                14 ms
+  isError                false
+  result:
+    📡 **GPU** — `local-llamacpp-1650ti-2b-q4_0`
+    NVIDIA GeForce GTX 1650 Ti with Max-Q Design, 7.5, 4096 MiB, 1632 MiB, 2101 MiB, 615.71.09
+ 
+== tools/call model_server_status ====================================
+  latency                27 ms
+  result:
+    ✅ Serving at http://127.0.0.1:8080 (pid 83619). `/health` → 200.
+ 
+== tools/call query_model ============================================
+  arguments              {&quot;max_tokens&quot;:1024,&quot;prompt&quot;:&quot;In one sentence, what is a TPU?&quot;}
+  latency                4608 ms
+  isError                false
+  result:
+    ✅ **Reply**
+ 
+    A TPU (Tensor Processing Unit) is a specialized integrated circuit developed by Google designed to accelerate machine learning workloads, specifically the complex matrix multiplications required by neural networks, significantly speeding up training and inference.
+ 
+    ---
+    _(plus 1173 chars of reasoning, suppressed)_
+    prompt 25 tok · completion 326 tok · 71.3 tok/s
+ 
+== Server log (stderr) ===============================================
+  2026-09-11 16:27:09,682 INFO HTTP Request: GET http://127.0.0.1:8080/health &quot;HTTP/1.1 200 OK&quot;
+  2026-09-11 16:27:14,292 INFO HTTP Request: POST http://127.0.0.1:8080/v1/chat/completions &quot;HTTP/1.1 200 OK&quot;</code></pre>
+<p>✅ Same model, same kind of answer. What came back around it is
+completely different: the GPU and its memory, the server's health, and a
+reply formatted for an agent to read — with the reasoning reduced to its
+length.</p>
+<p>The server log at the bottom shows the HTTP call the tool made on the
+client's behalf. That is the "same servers" arrow in the diagram,
+visible.</p>
+<hr />
+<h4 id="only-read-only-tools--a-hard-rule">Only Read-Only Tools — a Hard
+Rule</h4>
+<p>The rig servers also offer tools that start and stop the model
+server, and on Cloud Run, deploy, destroy and rescale a billed GPU
+service. The client calls a fixed list and nothing else:</p>
+<pre class="rust"><code>/// Read-only tools called before the query. Never add a tool that deploys, destroys,
+/// scales, starts, or stops anything: those are billed or destructive.
+fn status_tools(self) -&gt; &amp;&#39;static [&amp;&#39;static str] {
+    match self {
+        Rig::Local =&gt; &amp;[&quot;gpu_status&quot;, &quot;model_server_status&quot;, &quot;model_info&quot;],
+        Rig::Cloudrun =&gt; &amp;[
+            &quot;cloudrun_status&quot;,
+            &quot;cloudrun_get_system_status&quot;,
+            &quot;cloudrun_get_model_details&quot;,
+        ],
+    }
+}</code></pre>
+<p>There is no "call any tool" option, on the command line or in
+interactive mode. A demo that can be talked into
+<code>cloudrun_destroy</code> is not a demo anyone should run in front
+of an audience.</p>
+<hr />
+<h4 id="mag_right-tip-failure-is-in-the-text-not-the-protocol">🔎 Tip:
+Failure Is in the Text, Not the Protocol</h4>
+<p>MCP has an <code>isError</code> flag on every tool result. These rig
+tools never set it. They report failure as markdown that starts with
+<code>❌</code>, and a reasoning-only reply as markdown that starts with
+<code>📡</code>:</p>
+<pre class="shell"><code>./target/release/gemma-rust-mcp --no-status --max-tokens 32 &quot;In one sentence, what is a TPU?&quot;; echo &quot;exit=$?&quot;
+== tools/call query_model ============================================
+  arguments              {&quot;max_tokens&quot;:32,&quot;prompt&quot;:&quot;In one sentence, what is a TPU?&quot;}
+  latency                499 ms
+  isError                false
+  result:
+    📡 **Reasoning only — no answer yet.** `finish_reason: length` after 32 tokens, all of them thinking.
+ 
+    This is Gemma 4 reasoning, not a broken server. Re-run with a larger `max_tokens` (currently 32).
+    ...
+  No answer: the model was still reasoning when it stopped. Raise --max-tokens.
+exit=2</code></pre>
+<p><code>isError false</code>, and still not an answer. A client that
+trusts the protocol flag reports success here. This one reads the first
+character of the text, and exits 2 exactly like the HTTP client
+does.</p>
+<hr />
+<h4 id="mcp-against-cloud-run">MCP Against Cloud Run</h4>
+<pre class="shell"><code>./target/release/gemma-rust-mcp --rig cloudrun &quot;In one sentence, what is a TPU?&quot;
+== MCP server ========================================================
+  rig                    gpu-2B-cloudrun-devops-agent
+  initialize             ok in 3219 ms
+ 
+== Server info =======================================================
+  name                   Self-Hosted vLLM DevOps Agent
+  protocol               2025-11-25
+ 
+== Tools =============================================================
+  tools/list             27 tools in 2 ms
+  ...
+ 
+== tools/call cloudrun_query_gemma4_with_stats =======================
+  arguments              {&quot;prompt&quot;:&quot;In one sentence, what is a TPU?&quot;}
+  latency                1333 ms
+  isError                false
+  result:
+    ### 📊 Performance Stats
+    - **Model:** `/mnt/models/gemma-4-E2B-it`
+    - **Time to First Token (TTFT):** `0.086s`
+    - **Total Generation Time:** `0.688s`
+    - **Tokens per Second:** `53.11 tokens/s`
+    - **Total Tokens (approx.):** `32`
+ 
+    ### 💬 Model Response
+    A TPU (Tensor Processing Unit) is a specialized type of integrated circuit designed to accelerate machine learning workloads, particularly those involving tensor operations common in deep learning.&lt;turn|&gt;
+ 
+== Server log (stderr) ===============================================
+  ... INFO - 📡 Automatically discovered vLLM at: https://&lt;your-service&gt;.a.run.app
+  2026-09-11 11:41:36,754 - httpx - INFO - HTTP Request: GET https://&lt;your-service&gt;.a.run.app/health &quot;HTTP/1.1 200 OK&quot;
+  2026-09-11 11:41:37,399 - httpx2 - INFO - HTTP Request: GET https://&lt;your-service&gt;.a.run.app/v1/models &quot;HTTP/1.1 200 OK&quot;
+  2026-09-11 11:41:37,479 - httpx2 - INFO - HTTP Request: POST https://&lt;your-service&gt;.a.run.app/v1/chat/completions &quot;HTTP/1.1 200 OK&quot;</code></pre>
+<p>Three things the HTTP client could not have shown:</p>
+<ul>
+<li><strong>TTFT.</strong> The tool streams, so it measures time to
+first token — 0.086 s. The HTTP client makes one non-streaming call and
+sees only the total.</li>
+<li><strong>The cost of the extra hop.</strong> The server log shows the
+tool doing a <code>GET /health</code> and a <code>GET /v1/models</code>
+before its <code>POST</code>. The HTTP client does those once per
+session; this tool does them on every call.</li>
+<li><strong>A bug, in the server.</strong> The answer ends in
+<code>&lt;turn|&gt;</code>, Gemma's end-of-turn marker, leaked by the
+rig's streaming tool. The client prints what the tool returned — which
+is how the bug was found.</li>
+</ul>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p>The same question, through the same two servers:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma-rust/main/docs/medium/img/devto-gemma-rust-table-4.png"
+alt="Table: 🦀 gemma-rust (HTTP), 🦀 gemma-rust-mcp (MCP)" /></p>
+<p>And what it cost, measured:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma-rust/main/docs/medium/img/devto-gemma-rust-table-5.png"
+alt="Table: 🦀 gemma-rust (HTTP), 🦀 gemma-rust-mcp (MCP)" /></p>
+<p><strong>Locally, it is a tie.</strong> 4786 ms for 330 tokens against
+4608 ms for 326: the model's thinking dominates both, and one sample
+each cannot separate the MCP layer from the difference between one Gemma
+reply and the next.</p>
+<p><strong>On Cloud Run, the hop shows.</strong> 1333 ms against 662 ms
+is 671 ms (arithmetic), roughly the two extra round trips the tool makes
+before it asks. Session start is where MCP really pays: 3219 ms to
+launch Python, import the SDK and discover the service URL through
+<code>gcloud</code>, before the first tool call.</p>
+<p><strong>The smaller crate is the MCP one</strong>, because it speaks
+stdio and never opens a TLS connection. <code>reqwest</code> with
+<code>rustls</code> brings a TLS stack; the MCP client leaves the HTTPS
+to the Python server.</p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p><strong>Use the HTTP client to see the model.</strong> Reasoning,
+exact token counts, cached tokens, server timings, the raw JSON with
+<code>--raw</code>. When the question is "what did Gemma do", this is
+the one.</p>
+<p><strong>Use the MCP client to see the agent's view.</strong> It is
+the fastest way to test an MCP server from outside the SDK it was
+written with, and it found two things no unit test did: a failure flag
+that is never set, and an end-of-turn marker leaking into answers.</p>
+<p>Neither half of that is about Rust being fast. The work is a model
+thinking on a GPU. Rust earns its place here with one static binary per
+client, a type for every response field, and a compiler that notices
+when vLLM and llama.cpp disagree about where the reasoning goes.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to ask Gemma 4 E2B the same question
+from Rust in two ways — directly over its HTTP endpoint, and through the
+rig's MCP server — on a local llama.cpp GPU and on Cloud Run. The key to
+the solution was printing everything each path returns, which turns two
+small clients into a side-by-side view of what a model says and what an
+agent sees. The results were:</p>
+<ul>
+<li>🟢 One HTTP code path served both targets by taking the model id
+from <code>/v1/models</code> and reading both reasoning fields</li>
+<li>🟢 Both clients report an empty answer from a thinking-starved Gemma
+4 as exit 2, not as success</li>
+<li>🟢 The MCP client added GPU, model and deployment status, plus TTFT
+on Cloud Run, from the rig's own tools</li>
+<li>❌ The MCP path loses the reasoning text and, on Cloud Run, exact
+token counts</li>
+<li>⚠️ On Cloud Run the MCP query took 1333 ms against 662 ms over HTTP,
+and 3219 ms to initialize</li>
+<li>⚠️ The rig tools report failure in text with <code>isError</code>
+false, and the Cloud Run tool leaks <code>&lt;turn|&gt;</code></li>
+</ul>
+<p>Scope: one laptop with a GTX 1650 Ti Max-Q (4 GiB, driver 615.71.09)
+running llama.cpp <code>b1-95ef7fc</code> with the Gemma 4 E2B QAT q4_0
+GGUF, and one Cloud Run service on an NVIDIA L4 running vLLM 0.26.0. One
+run per client per target, so each figure is a single sample and model
+replies vary from run to run; the local runs were captured at 16:27 on
+2026-09-11 and the Cloud Run runs earlier the same day, and the HTTP and
+MCP runs are separate requests, not the same one observed twice. Rust
+1.98.1, <code>rmcp</code> 3.3.0, <code>reqwest</code> 0.13.5, Python
+3.14.7 with <code>mcp</code> 2.2.0.</p>
+<p>The strategy for using Rust to call Gemma 4 over HTTP and over MCP
+was validated with an incremental step by step approach.</p>
+<h4 id="references">References</h4>
+<ul>
+<li><a href="https://github.com/xbill9/gemma-rust">gemma-rust |
+GitHub</a></li>
+<li><a href="https://github.com/xbill9/gemma-rust-mcp">gemma-rust-mcp |
+GitHub</a></li>
+<li><a href="https://github.com/xbill9/gemma4-dev">gemma4-dev rigs |
+GitHub</a></li>
+<li><a href="https://github.com/modelcontextprotocol/rust-sdk">rmcp —
+the official Rust MCP SDK</a></li>
+<li><a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a></li>
+<li><a
+href="https://dev.to/gde/gemma-4-on-an-old-4-gb-laptop-gpu-qat-takes-it-from-95-gib-to-16-b5l">Gemma
+4 on an 2021 4 GB Laptop GPU: QAT Takes It From 9.5 GiB to 1.6</a></li>
+<li><a
+href="https://dev.to/gde/2b-gemma-4-deployment-with-cloud-run-nvidia-l4-mcp-sdk-2x-and-claude-code-4ml3">2B
+Gemma 4 Deployment with Cloud Run, NVIDIA L4, MCP SDK 2.x, and Claude
+Code</a></li>
+</ul>
+</body>
+</html>
