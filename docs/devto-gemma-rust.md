@@ -3,7 +3,7 @@ title: "Two Rust Clients for Gemma 4: Calling the Endpoint vs. Calling the MCP S
 published: false
 description: "Step by step: a Rust HTTP client (reqwest) and a Rust MCP client (rmcp) ask Gemma 4 E2B the same question on a local llama.cpp GPU and on Cloud Run — what each one can see, and what each one costs."
 tags: rust, mcp, gemma, llamacpp
-cover_image: https://raw.githubusercontent.com/xbill9/gemma-rust/main/docs/devto-cover.cf7b1a72.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma-rust/main/docs/devto-cover.e53a0fba.jpg
 ---
 
 This article provides a step by step guide to two small Rust CLIs that ask a self-hosted Gemma 4 E2B the same question. The first calls the model's OpenAI-compatible HTTP endpoint directly. The second is an MCP client: it launches the rig's own MCP server and asks through its tools.
