@@ -6,7 +6,7 @@ PROMPT ?= Why is the sky blue? Answer in two sentences.
 LOCAL_RIG := $(HOME)/gemma4-dev/local-llamacpp-1650ti-2b-q4_0
 CLOUD_RIG := $(HOME)/gemma4-dev/gpu-2B-cloudrun-devops-agent
 
-.PHONY: all build debug prod release run run-debug run-cloud clean lint clippy fmt format fmt-check check test ci help
+.PHONY: all build debug prod release run run-debug run-cloud chat chat-cloud clean lint clippy fmt format fmt-check check test ci help
 
 # The default target
 all: debug
@@ -40,6 +40,14 @@ run-debug:
 run-cloud:
 	@echo "Asking Cloud Run (first request may take minutes on a cold start)..."
 	@GEMMA_ENDPOINT=$$(make -s -C $(CLOUD_RIG) endpoint) cargo run --release -- "$(PROMPT)"
+
+# Interactive session with the local rig
+chat:
+	@cargo run --release -- --interactive
+
+# Interactive session with Cloud Run
+chat-cloud:
+	@GEMMA_ENDPOINT=$$(make -s -C $(CLOUD_RIG) endpoint) cargo run --release -- --interactive
 
 # Clean the project
 clean:
@@ -94,6 +102,8 @@ help:
 	@echo "    run          Ask the local llama.cpp rig (release build)"
 	@echo "    run-debug    Ask the local llama.cpp rig (debug build)"
 	@echo "    run-cloud    Ask the Cloud Run vLLM service (identity token via gcloud)"
+	@echo "    chat         Interactive session with the local rig (keeps the conversation)"
+	@echo "    chat-cloud   Interactive session with Cloud Run"
 	@echo "    clean        Remove build artefacts"
 	@echo "    lint         clippy -D warnings + format check"
 	@echo "    clippy       clippy only"

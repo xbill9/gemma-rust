@@ -27,6 +27,11 @@ Each rig's `CLAUDE.md` is the reference for how its server behaves.
 - `--auth auto` (default) fetches `gcloud auth print-identity-token` for `*.run.app` hosts only;
   `--token`/`GEMMA_TOKEN` supplies one directly. Never print the token.
 - Exit codes: 0 answered, 1 error, 2 empty answer.
+- `-i/--interactive` (`make chat`, `make chat-cloud`): `connect()` runs once, then each prompt goes
+  through the same `ask()` as a single run, so every turn prints the full sections. The history
+  sent with each turn holds only user prompts and answers, never reasoning; empty answers stay out of
+  it. A turn's error is printed and the loop continues; exit 0 on `/quit` or Ctrl-D.
+- `make help` lists the targets: `debug`, `prod`, `lint`, `test`, `ci`, `run`, `run-cloud`, `chat`, `clean`, ….
 
 ## The two targets differ — measured 2026-09-11
 

@@ -9,10 +9,14 @@ use anyhow::{Context, Result, bail};
 use clap::{Parser, ValueEnum};
 use reqwest::blocking::{Client, RequestBuilder};
 use reqwest::{StatusCode, Url};
+use rustyline::DefaultEditor;
+use rustyline::error::ReadlineError;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
 const LOCAL_SERVE_HINT: &str = "make -C ~/gemma4-dev/local-llamacpp-1650ti-2b-q4_0 serve";
+const DEFAULT_PROMPT: &str = "In one sentence, what is a TPU?";
+const INTERACTIVE_HELP: &str = "Commands: /reset clears the conversation (do it when the context fills), /help, /quit (or Ctrl-D).";
 
 #[derive(Parser)]
 #[command(
@@ -20,9 +24,12 @@ const LOCAL_SERVE_HINT: &str = "make -C ~/gemma4-dev/local-llamacpp-1650ti-2b-q4
     about = "Ask a Gemma 4 endpoint one question and show the details"
 )]
 struct Args {
-    /// Prompt to send
-    #[arg(default_value = "In one sentence, what is a TPU?")]
-    prompt: String,
+    /// Prompt to send [default: "In one sentence, what is a TPU?"]; with --interactive, the first turn
+    prompt: Option<String>,
+
+    /// Keep asking: read prompts from the terminal, sending each with the conversation so far
+    #[arg(short, long)]
+    interactive: bool,
 
     /// Base URL of an OpenAI-compatible server: the local llama.cpp rig or a Cloud Run URL
     #[arg(
@@ -154,6 +161,39 @@ fn main() -> ExitCode {
 }
 
 fn run(args: Args) -> Result<ExitCode> {
+    let Some(session) = connect(&args)? else {
+        return Ok(ExitCode::FAILURE);
+    };
+    if args.interactive {
+        return interactive(&args, &session);
+    }
+    let prompt = args.prompt.as_deref().unwrap_or(DEFAULT_PROMPT);
+    Ok(match ask(&args, &session, &[], prompt)? {
+        Some(_) => ExitCode::SUCCESS,
+        None => ExitCode::from(2),
+    })
+}
+
+/// A server that passed the health check, and the model to ask it for.
+struct Session {
+    client: Client,
+    base: String,
+    token: Option<String>,
+    model: String,
+}
+
+impl Session {
+    fn authed(&self, rb: RequestBuilder) -> RequestBuilder {
+        match &self.token {
+            Some(t) => rb.bearer_auth(t),
+            None => rb,
+        }
+    }
+}
+
+/// Print the target, check /health and pick the model. None when the server is unreachable or
+/// rejects the credentials; the reason has already been printed.
+fn connect(args: &Args) -> Result<Option<Session>> {
     let base = args.endpoint.trim_end_matches('/').to_string();
     let url = Url::parse(&base).with_context(|| format!("invalid endpoint {base:?}"))?;
     let target = Target::of(&url);
@@ -161,7 +201,7 @@ fn run(args: Args) -> Result<ExitCode> {
     section("Target");
     field("endpoint", &base);
     field("target", target.label());
-    let token = resolve_token(&args, target)?;
+    let token = resolve_token(args, target)?;
     field(
         "auth",
         match &token {
@@ -196,7 +236,7 @@ fn run(args: Args) -> Result<ExitCode> {
                     "  The local llama-server is not running. Start it with:\n    {LOCAL_SERVE_HINT}"
                 );
             }
-            return Ok(ExitCode::FAILURE);
+            return Ok(None);
         }
         Err(e) => return Err(e).context("GET /health"),
     };
@@ -220,7 +260,7 @@ fn run(args: Args) -> Result<ExitCode> {
             "  The server rejected the request's credentials. Cloud Run needs an identity token from an \
              account with roles/run.invoker (`gcloud auth print-identity-token`)."
         );
-        return Ok(ExitCode::FAILURE);
+        return Ok(None);
     }
     if !status.is_success() {
         bail!("server is not healthy: GET /health returned {status}");
@@ -261,30 +301,47 @@ fn run(args: Args) -> Result<ExitCode> {
         }
     };
 
+    Ok(Some(Session {
+        client,
+        base,
+        token: token.map(|(_, t)| t),
+        model,
+    }))
+}
+
+/// Send one chat completion and print everything about it. `history` holds the earlier turns.
+/// Returns the answer, or None when the model returned an empty one.
+fn ask(args: &Args, session: &Session, history: &[Value], prompt: &str) -> Result<Option<String>> {
     section("Request");
-    let chat_url = format!("{base}/v1/chat/completions");
+    let chat_url = format!("{}/v1/chat/completions", session.base);
     field("POST", &chat_url);
     let mut messages = Vec::new();
     if let Some(system) = &args.system {
         field("system", system);
         messages.push(json!({"role": "system", "content": system}));
     }
-    field("prompt", &args.prompt);
-    messages.push(json!({"role": "user", "content": args.prompt}));
+    if !history.is_empty() {
+        field("history", format!("{} earlier messages", history.len()));
+        messages.extend_from_slice(history);
+    }
+    field("prompt", prompt);
+    messages.push(json!({"role": "user", "content": prompt}));
     field("max_tokens", args.max_tokens);
     if args.max_tokens < 512 {
         println!(
             "  warning: below 512, Gemma 4 may still be reasoning when it hits the limit and return an empty answer"
         );
     }
-    let mut request = json!({"model": model, "messages": messages, "max_tokens": args.max_tokens});
+    let mut request =
+        json!({"model": session.model, "messages": messages, "max_tokens": args.max_tokens});
     if let Some(t) = args.temperature {
         field("temperature", t);
         request["temperature"] = json!(t);
     }
 
     let started = Instant::now();
-    let response = authed(client.post(&chat_url).json(&request))
+    let response = session
+        .authed(session.client.post(&chat_url).json(&request))
         .send()
         .context("POST /v1/chat/completions")?;
     let status = response.status();
@@ -294,7 +351,13 @@ fn run(args: Args) -> Result<ExitCode> {
         section("Error");
         field("status", status);
         println!("{}", indent(&text));
-        return Ok(ExitCode::FAILURE);
+        if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
+            println!(
+                "  The server rejected the credentials. gcloud identity tokens expire after an hour: \
+                 restart to fetch a new one."
+            );
+        }
+        bail!("POST /v1/chat/completions returned {status}");
     }
     let raw: Value = serde_json::from_str(&text).context("the completion response is not JSON")?;
     let parsed: ChatResponse =
@@ -373,11 +436,52 @@ fn run(args: Args) -> Result<ExitCode> {
         println!("{}", serde_json::to_string_pretty(&raw)?);
     }
 
-    Ok(if content.is_empty() {
-        ExitCode::from(2)
-    } else {
-        ExitCode::SUCCESS
-    })
+    Ok((!content.is_empty()).then(|| content.to_string()))
+}
+
+/// Read prompts until /quit or Ctrl-D, sending each with the conversation so far.
+fn interactive(args: &Args, session: &Session) -> Result<ExitCode> {
+    section("Interactive");
+    println!("  Each prompt is sent with the conversation so far (answers only, not reasoning).");
+    println!("  {INTERACTIVE_HELP}");
+    let mut editor = DefaultEditor::new().context("starting the line editor")?;
+    let mut history: Vec<Value> = Vec::new();
+    let mut next = args.prompt.clone();
+    loop {
+        let line = match next.take() {
+            Some(prompt) => prompt,
+            None => match editor.readline("\ngemma> ") {
+                Ok(line) => line,
+                Err(ReadlineError::Interrupted) => continue,
+                Err(ReadlineError::Eof) => break,
+                Err(e) => return Err(e).context("reading a prompt"),
+            },
+        };
+        let prompt = line.trim();
+        if prompt.is_empty() {
+            continue;
+        }
+        let _ = editor.add_history_entry(prompt);
+        match prompt {
+            "/quit" | "/exit" => break,
+            "/help" => println!("  {INTERACTIVE_HELP}"),
+            "/reset" => {
+                history.clear();
+                println!("  Conversation cleared.");
+            }
+            p if p.starts_with('/') => println!("  Unknown command {p}. {INTERACTIVE_HELP}"),
+            _ => match ask(args, session, &history, prompt) {
+                Ok(Some(answer)) => {
+                    history.push(json!({"role": "user", "content": prompt}));
+                    history.push(json!({"role": "assistant", "content": answer}));
+                }
+                // An empty answer stays out of the conversation; ask() has said why.
+                Ok(None) => {}
+                Err(e) => eprintln!("\nerror: {e:#}"),
+            },
+        }
+    }
+    Ok(ExitCode::SUCCESS)
 }
 
 /// The bearer token to send, with where it came from; never printed.

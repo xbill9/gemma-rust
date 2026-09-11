@@ -34,6 +34,9 @@ GEMMA_ENDPOINT=https://<your-service>.a.run.app gemma-rust "In one sentence, wha
 
 # Also dump the raw JSON response
 gemma-rust --raw "Why is the sky blue?"
+
+# Interactive: keep asking, carrying the conversation from turn to turn (make chat / chat-cloud)
+gemma-rust -i
 ```
 
 | Option | Env | Default | |
@@ -47,8 +50,15 @@ gemma-rust --raw "Why is the sky blue?"
 | `--system` | | | System prompt |
 | `--timeout` | | `600` | Seconds; Cloud Run can take minutes to cold-start a GPU |
 | `--raw` | | | Also print the raw JSON response |
+| `-i, --interactive` | | | Read prompts until `/quit` or Ctrl-D, sending each with the conversation so far |
 
 Exit codes: `0` answered, `1` error, `2` the model returned an empty answer.
+
+**Interactive mode** checks the server once, then prints the full Request-to-Response sections for
+every prompt. Earlier answers (not their reasoning) are sent as history, so follow-up questions
+work; `/reset` clears it, which you need when the history reaches the context size (8192 tokens on
+the local rig). A prompt given on the command line becomes the first turn. A failed turn is printed
+and the session continues; it exits `0` on `/quit` or Ctrl-D.
 
 ## Setting up a server
 
