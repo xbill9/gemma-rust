@@ -6,7 +6,7 @@ PROMPT ?= Why is the sky blue? Answer in two sentences.
 LOCAL_RIG := $(HOME)/gemma4-dev/local-llamacpp-1650ti-2b-q4_0
 CLOUD_RIG := $(HOME)/gemma4-dev/gpu-2B-cloudrun-devops-agent
 
-.PHONY: all build debug prod release run run-debug run-cloud chat chat-cloud clean lint clippy fmt format fmt-check check test ci help
+.PHONY: all build debug prod release run run-debug run-cloud chat chat-cloud status status-cloud clean lint clippy fmt format fmt-check check test ci help
 
 # The default target
 all: debug
@@ -48,6 +48,45 @@ chat:
 # Interactive session with Cloud Run
 chat-cloud:
 	@GEMMA_ENDPOINT=$$(make -s -C $(CLOUD_RIG) endpoint) cargo run --release -- --interactive
+
+# Local rig: host GPU memory, then what the server reports (version, model, slots, metrics)
+status:
+	@printf '\n== Host GPU (nvidia-smi) =============================================\n'
+	@if command -v nvidia-smi >/dev/null; then \
+		nvidia-smi --query-gpu=name,driver_version,memory.total,memory.used,memory.free,utilization.gpu,temperature.gpu --format=csv | sed 's/^/  /'; \
+		nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv | sed 's/^/  /'; \
+	else echo "  nvidia-smi not found"; fi
+	@cargo run -q --release -- --status
+
+# Cloud Run: the deployment (gcloud, read-only), then what the server reports. The service,
+# project and region are read from the rig's Makefile, never written here.
+status-cloud:
+	@rv() { $(MAKE) -s --no-print-directory -C $(CLOUD_RIG) --eval='print-%: ; @echo $$($$*)' print-$$1; }; \
+	printf '\n== Deployment (gcloud run services describe) =========================\n'; \
+	gcloud run services describe "$$(rv SERVICE_NAME)" --project="$$(rv PROJECT_ID)" \
+		--region="$$(rv REGION)" --format=json | jq -r "$$DEPLOY_JQ"
+	@GEMMA_ENDPOINT=$$(make -s -C $(CLOUD_RIG) endpoint) cargo run -q --release -- --status
+
+# Rows for status-cloud, in the CLI's "  key<22> value" layout
+define DEPLOY_JQ
+def row(k; v): "  " + ((k + "                        ")[:23]) + (if v == null then "-" else (v | tostring) end);
+row("service"; .metadata.name),
+row("url"; .status.url),
+row("ready"; [.status.conditions[] | select(.type == "Ready") | .status + (if .message then " (" + .message + ")" else "" end)] | first),
+row("revision"; .status.latestReadyRevisionName),
+row("traffic"; [.status.traffic[] | "\(.percent)% \(.revisionName // "latest")"] | join(", ")),
+row("scaling"; if .metadata.annotations["run.googleapis.com/scalingMode"] == "manual"
+  then "manual: \(.metadata.annotations["run.googleapis.com/manualInstanceCount"]) instance(s) always running, billed while idle"
+  else "auto: \(.spec.template.metadata.annotations["autoscaling.knative.dev/minScale"] // "0") to \(.spec.template.metadata.annotations["autoscaling.knative.dev/maxScale"] // "?") instances" end),
+row("gpu"; "\(.spec.template.spec.containers[0].resources.limits["nvidia.com/gpu"] // "0") x \(.spec.template.spec.nodeSelector["run.googleapis.com/accelerator"] // "none")"),
+row("cpu"; .spec.template.spec.containers[0].resources.limits.cpu),
+row("memory"; .spec.template.spec.containers[0].resources.limits.memory),
+row("concurrency"; .spec.template.spec.containerConcurrency),
+row("timeout"; "\(.spec.template.spec.timeoutSeconds) s"),
+row("image"; .spec.template.spec.containers[0].image),
+(.spec.template.spec.containers[0].args // [] | .[] | row("arg"; .))
+endef
+export DEPLOY_JQ
 
 # Clean the project
 clean:
@@ -104,6 +143,8 @@ help:
 	@echo "    run-cloud    Ask the Cloud Run vLLM service (identity token via gcloud)"
 	@echo "    chat         Interactive session with the local rig (keeps the conversation)"
 	@echo "    chat-cloud   Interactive session with Cloud Run"
+	@echo "    status       Local rig: GPU memory, server version, model, slots, metrics"
+	@echo "    status-cloud Cloud Run: deployment (gcloud), server version, model, metrics"
 	@echo "    clean        Remove build artefacts"
 	@echo "    lint         clippy -D warnings + format check"
 	@echo "    clippy       clippy only"

@@ -31,6 +31,11 @@ Each rig's `CLAUDE.md` is the reference for how its server behaves.
   through the same `ask()` as a single run, so every turn prints the full sections. The history
   sent with each turn holds only user prompts and answers, never reasoning; empty answers stay out of
   it. A turn's error is printed and the loop continues; exit 0 on `/quit` or Ctrl-D.
+- `--status` runs `connect()`, then `status()` probes `/version` (vLLM only), `/props` and `/slots`
+  (llama.cpp only), `/v1/models` and `/metrics`, printing each probe's HTTP status. Endpoints
+  differ between the servers, so a 404 is reported, not an error. `make status` adds `nvidia-smi`;
+  `make status-cloud` adds a `gcloud run services describe` summary (jq in `DEPLOY_JQ`), with the
+  service, project and region read from the rig's Makefile — keep those values out of this repo.
 - `make help` lists the targets: `debug`, `prod`, `lint`, `test`, `ci`, `run`, `run-cloud`, `chat`, `clean`, ….
 
 ## The two targets differ — measured 2026-09-11

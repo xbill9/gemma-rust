@@ -37,7 +37,16 @@ gemma-rust --raw "Why is the sky blue?"
 
 # Interactive: keep asking, carrying the conversation from turn to turn (make chat / chat-cloud)
 gemma-rust -i
+
+# What the server reports about itself: version, model details, slots, metrics
+gemma-rust --status
 ```
+
+`make status` adds the host GPU's memory (`nvidia-smi`) to `--status` for the local rig. `make
+status-cloud` adds the Cloud Run deployment: readiness, revision, scaling mode, GPU, CPU, memory,
+image and vLLM arguments (`gcloud run services describe`, read-only). It reads the service name,
+project and region from the rig's Makefile. Probing the server wakes Cloud Run if it has scaled to
+zero.
 
 | Option | Env | Default | |
 |---|---|---|---|
@@ -51,6 +60,7 @@ gemma-rust -i
 | `--timeout` | | `600` | Seconds; Cloud Run can take minutes to cold-start a GPU |
 | `--raw` | | | Also print the raw JSON response |
 | `-i, --interactive` | | | Read prompts until `/quit` or Ctrl-D, sending each with the conversation so far |
+| `--status` | | | Print the server's version, model details, slots and metrics instead of asking |
 
 Exit codes: `0` answered, `1` error, `2` the model returned an empty answer.
 

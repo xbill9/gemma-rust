@@ -31,6 +31,10 @@ struct Args {
     #[arg(short, long)]
     interactive: bool,
 
+    /// Show what the server reports about itself (version, model, slots, metrics) and exit
+    #[arg(long, conflicts_with_all = ["prompt", "interactive", "raw"])]
+    status: bool,
+
     /// Base URL of an OpenAI-compatible server: the local llama.cpp rig or a Cloud Run URL
     #[arg(
         short,
@@ -164,6 +168,10 @@ fn run(args: Args) -> Result<ExitCode> {
     let Some(session) = connect(&args)? else {
         return Ok(ExitCode::FAILURE);
     };
+    if args.status {
+        status(&session);
+        return Ok(ExitCode::SUCCESS);
+    }
     if args.interactive {
         return interactive(&args, &session);
     }
@@ -482,6 +490,218 @@ fn interactive(args: &Args, session: &Session) -> Result<ExitCode> {
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+/// Print everything the server reports about itself. The two servers expose different endpoints
+/// (vLLM: /version; llama.cpp: /props and /slots), so each probe says whether it was served.
+fn status(session: &Session) {
+    section("Server");
+    if let Some(version) = probe_json(session, "/version") {
+        field("vLLM version", show(&version["version"]));
+    }
+    if let Some(props) = probe_json(session, "/props") {
+        field("llama.cpp build", show(&props["build_info"]));
+        field("model_ftype", show(&props["model_ftype"]));
+        field(
+            "n_ctx",
+            show(&props["default_generation_settings"]["n_ctx"]),
+        );
+        field("total_slots", show(&props["total_slots"]));
+        field("is_sleeping", show(&props["is_sleeping"]));
+        let modalities: Vec<&str> = props["modalities"]
+            .as_object()
+            .into_iter()
+            .flatten()
+            .filter(|(_, on)| on.as_bool() == Some(true))
+            .map(|(name, _)| name.as_str())
+            .collect();
+        field(
+            "modalities",
+            if modalities.is_empty() {
+                "text only".to_string()
+            } else {
+                format!("text, {}", modalities.join(", "))
+            },
+        );
+    }
+
+    section("Model details");
+    if let Some(models) = probe_json(session, "/v1/models") {
+        for model in models["data"].as_array().into_iter().flatten() {
+            let Some(model) = model.as_object() else {
+                continue;
+            };
+            // llama.cpp nests its numbers under "meta"; vLLM puts max_model_len at the top level.
+            let meta = model.get("meta").and_then(Value::as_object);
+            for (key, value) in model.iter().chain(meta.into_iter().flatten()) {
+                if key == "meta" || value.is_object() || value.is_array() {
+                    continue;
+                }
+                let shown = match (key.as_str(), value.as_f64()) {
+                    ("n_params", Some(n)) => format!("{value} ({:.2} B parameters)", n / 1e9),
+                    ("size", Some(n)) => format!("{value} ({:.2} GB on disk)", n / 1e9),
+                    _ => show(value),
+                };
+                field(key, shown);
+            }
+        }
+    }
+
+    section("Slots");
+    if let Some(Value::Array(slots)) = probe_json(session, "/slots") {
+        let busy = slots
+            .iter()
+            .filter(|s| s["is_processing"].as_bool() == Some(true))
+            .count();
+        field("slots", format!("{} ({busy} busy)", slots.len()));
+        for slot in &slots {
+            field(
+                &format!("slot {}", show(&slot["id"])),
+                format!(
+                    "n_ctx {}, processing {}",
+                    show(&slot["n_ctx"]),
+                    show(&slot["is_processing"])
+                ),
+            );
+        }
+    }
+
+    section("Metrics");
+    if let Some(text) = probe(session, "/metrics") {
+        print_metrics(&text);
+    }
+}
+
+/// GET a path for --status, printing its status and latency. The body only if it answered 2xx.
+fn probe(session: &Session, path: &str) -> Option<String> {
+    let label = format!("GET {path}");
+    let started = Instant::now();
+    match session
+        .authed(session.client.get(format!("{}{path}", session.base)))
+        .send()
+    {
+        Ok(r) if r.status().is_success() => {
+            field(
+                &label,
+                format!("{} in {}", r.status(), ms(started.elapsed())),
+            );
+            r.text().ok()
+        }
+        Ok(r) => {
+            field(
+                &label,
+                format!("{} (not served by this server)", r.status()),
+            );
+            None
+        }
+        Err(e) => {
+            field(&label, format!("failed: {:#}", anyhow::Error::from(e)));
+            None
+        }
+    }
+}
+
+fn probe_json(session: &Session, path: &str) -> Option<Value> {
+    probe(session, path).and_then(|body| serde_json::from_str(&body).ok())
+}
+
+/// Print the server's Prometheus metrics, minus histogram internals. Labels every series shares
+/// (engine, model_name) are dropped; *_info series carry their data in labels, so they get their
+/// own section.
+fn print_metrics(text: &str) {
+    let mut infos = Vec::new();
+    for line in text.lines() {
+        if line.starts_with('#') {
+            continue;
+        }
+        let Some((series, value)) = line.trim().rsplit_once(' ') else {
+            continue;
+        };
+        let (name, labels) = match series.split_once('{') {
+            Some((name, rest)) => (name, parse_labels(rest.trim_end_matches('}'))),
+            None => (series, Vec::new()),
+        };
+        let histogram = ["_bucket", "_sum", "_count", "_created"]
+            .iter()
+            .any(|suffix| name.ends_with(suffix));
+        let ours = name.starts_with("vllm:")
+            || name.starts_with("llamacpp:")
+            || name == "process_resident_memory_bytes";
+        if histogram || !ours {
+            continue;
+        }
+        let short = name
+            .trim_start_matches("vllm:")
+            .trim_start_matches("llamacpp:");
+        let labels: Vec<(String, String)> = labels
+            .into_iter()
+            .filter(|(k, _)| k != "engine" && k != "model_name")
+            .collect();
+        if name.ends_with("_info") {
+            infos.push((short.to_string(), labels));
+            continue;
+        }
+        let key = if labels.is_empty() {
+            short.to_string()
+        } else {
+            let labels: Vec<String> = labels.iter().map(|(k, v)| format!("{k}={v}")).collect();
+            format!("{short}{{{}}}", labels.join(","))
+        };
+        field(&key, metric_value(name, value));
+    }
+    for (name, labels) in infos {
+        section(&format!("Metrics: {name}"));
+        for (key, value) in labels {
+            field(&key, value);
+        }
+    }
+}
+
+/// Prometheus label pairs from the text between the braces: key="value",...
+fn parse_labels(text: &str) -> Vec<(String, String)> {
+    let mut labels = Vec::new();
+    let mut rest = text;
+    while let Some((key, after)) = rest.split_once("=\"") {
+        // The value ends at the first quote that is not escaped.
+        let mut escaped = false;
+        let Some(end) = after.char_indices().find_map(|(i, c)| {
+            let closes = c == '"' && !escaped;
+            escaped = c == '\\' && !escaped;
+            closes.then_some(i)
+        }) else {
+            break;
+        };
+        labels.push((
+            key.trim_start_matches(',').trim().to_string(),
+            after[..end].replace("\\\"", "\""),
+        ));
+        rest = &after[end + 1..];
+    }
+    labels
+}
+
+fn metric_value(name: &str, raw: &str) -> String {
+    let Ok(v) = raw.parse::<f64>() else {
+        return raw.to_string();
+    };
+    if name.ends_with("_bytes") {
+        format!("{:.2} GiB", v / (1u64 << 30) as f64)
+    } else if name.ends_with("_perc") {
+        format!("{:.1} %", v * 100.0)
+    } else if v.fract() == 0.0 && v.abs() < 1e15 {
+        format!("{}", v as i64)
+    } else {
+        format!("{v:.3}")
+    }
+}
+
+/// A JSON value as plain text: strings without quotes, null as "-".
+fn show(value: &Value) -> String {
+    match value {
+        Value::Null => "-".to_string(),
+        Value::String(s) => s.clone(),
+        other => other.to_string(),
+    }
 }
 
 /// The bearer token to send, with where it came from; never printed.
